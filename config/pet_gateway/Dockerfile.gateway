@@ -1,0 +1,29 @@
+FROM centos:7
+MAINTAINER DuyenLe <duyenlh@icd-vn.com>
+
+RUN yum -y update; yum clean all
+RUN yum -y install epel-release; yum clean all
+# RUN yum -y install nodejs npm; yum clean all
+
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | bash
+RUN source $HOME/.bashrc && nvm install 12.14.1
+
+RUN ln -s $HOME/.nvm/versions/node/v12.14.1/bin/node /usr/bin/node
+RUN ln -s $HOME/.nvm/versions/node/v12.14.1/bin/npm /usr/bin/npm
+
+
+ARG APP_DIR="/src"
+ARG NODE_SOURCE_DIR="pet_gateway"
+COPY package*.json APP_DIR/NODE_SOURCE_DIR/package.json
+
+
+# Install app dependencies
+RUN cd $APP_DIR/$NODE_SOURCE_DIR; npm install;
+
+#RUN npm install -g @angular/cli; npm install -g pm2
+
+ADD run-gateway.sh /run-gateway.sh
+RUN chmod -v +x /run-gateway.sh
+
+EXPOSE  3000
+CMD  ["/run-gateway.sh"]

@@ -1,0 +1,161 @@
+version: "3.7"
+
+services:
+  db:
+    image: mysql:5.7
+    container_name: mysql
+    ports:
+      - 33061:3306
+    restart: always
+    volumes:
+      - ./mysql:/var/lib/mysql
+      - ./db/run-update-db.sh:/run-update-db.sh
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      # MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      MYSQL_DATABASE: cainz_wp
+    networks:
+      custom_network:
+        ipv4_address: 172.18.0.5
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin
+    ports:
+      - 880:80
+    volumes:
+      - ./phpmyadmin/custom.ini:/usr/local/etc/php/conf.d/custom.ini
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=db
+    depends_on:
+      - db
+    networks:
+      custom_network:
+        ipv4_address: 172.18.0.7
+  angular:
+    build:
+      context: ./wanqol-frontend
+      dockerfile: Dockerfile.angular
+    container_name: angularq
+    ports:
+      - 4000:4000
+      - 42000:4200
+    volumes:
+      - ./wanqol-frontend/run-ng-build.sh:/src/run-ng-build.sh
+      - ./wanqol-frontend/angular-wanqol:/src/angular-wanqol
+      - /src/angular-wanqol/node_modules
+      - /src/angular-wanqol/dist
+    depends_on:
+      - db
+    networks:
+        custom_network:
+          ipv4_address: "172.18.0.8"
+  dogrun_front:
+    build:
+      context: ./Dogrun_front
+      dockerfile: Dockerfile.dogrun_front
+    container_name: dogrun_front
+    ports:
+      - 4200:4200
+    volumes:
+      - ./Dogrun_front/run-ng-build.sh:/src/run-ng-build.sh
+      - ./Dogrun_front:/src/dogrun_front
+      - /src/dogrun_front/node_modules
+      - /src/dogrun_front/dist
+    networks:
+        custom_network:
+          ipv4_address: "172.18.0.9"
+  dogrun_back:
+    build:
+      context: ./Dogrun_back
+      dockerfile: Dockerfile.dogrun_back
+    container_name: dogrun_back
+    ports:
+      - 8080:8080
+    volumes:
+      - ./Dogrun_back:/src/dogrun_back
+    networks:
+      custom_network:
+        ipv4_address: "172.18.0.10"
+    
+  # node:
+  #   build:
+  #     context: ./wanqol-frontend
+  #     dockerfile: Dockerfile.node
+  #   container_name: node
+  #   ports:
+  #     - 8080:8080
+  #   volumes:
+  #     - ./wanqol-frontend/node-api:/src/node-api
+  #     - /src/node-api/node_modules
+  #     - /src/node-api/lib
+  #   depends_on:
+  #     - db
+  #   networks:
+  #       custom_network:
+  #         ipv4_address: "172.18.0.9"
+  gateway:
+    build:
+      # context: ./config/pet_gateway
+      context: ./pet_gateway
+      dockerfile: Dockerfile.gateway
+    container_name: gateway
+    ports:
+      - 3000:3000 
+    volumes:
+      - ./pet_gateway:/src/pet_gateway
+      - ./pet_gateway/node_modules:/src/pet_gateway/node_modules
+    
+  nginx:
+    container_name: nginx
+    restart: unless-stopped
+    image: nginx
+    ports:
+        - 80:80
+        - 443:443
+    depends_on:
+      - gateway
+    volumes:
+        - ./nginx/nginx_pet_gateway.conf:/etc/nginx/conf.d/default.conf
+        - ./ssl/dev.petsgw.cainz.com.pem:/etc/nginx/certs/dev.petsgw.cainz.com.pem
+        - ./ssl/dev.petsgw.cainz.com-key.pem:/etc/nginx/certs/dev.petsgw.cainz.com-key.pem
+  
+  web:
+    build: ./wanqol-wp
+    container_name: web
+    ports:
+      - 888:80
+    volumes:
+      - ./wanqol-wp/wp:/var/www/html
+    environment:
+      AUTH_KEY: "AUTH_KEY"
+      SECURE_AUTH_KEY: "SECURE_AUTH_KEY"
+      LOGGED_IN_KEY: "LOGGED_IN_KEY"
+      NONCE_KEY: "NONCE_KEY"
+      AUTH_SALT: "AUTH_SALT"
+      SECURE_AUTH_SALT: "SECURE_AUTH_SALT"
+      LOGGED_IN_SALT: "LOGGED_IN_SALT"
+      NONCE_SALT: "NONCE_SALT"
+      WORDPRESS_DB_HOST: "172.18.0.5"
+      WORDPRESS_DB_USER: "root"
+      WORDPRESS_DB_PASSWORD: "root"
+      WORDPRESS_DB_NAME: "cainz_wp"
+      WORDPRESS_DB_CHARSET: "utf8"
+      WORDPRESS_DB_COLLATE: ""
+      WORDPRESS_TABLE_PREFIX: "wp_"
+      WORDPRESS_DEBUG: "false"
+    depends_on:
+      - db
+    networks:
+        custom_network:
+          ipv4_address: "172.18.0.6"
+
+networks:
+  custom_network:
+    name: private_network
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/16

@@ -1,0 +1,5 @@
+*.DS_Store
+mysql
+wanqol-frontend
+wanqol-wp
+.idea
